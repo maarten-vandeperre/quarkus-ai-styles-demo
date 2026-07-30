@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id 'io.quarkus'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:quarkus-langchain4j-bom:${quarkusPlatformVersion}")
+
+    // REST layer
+    implementation 'io.quarkus:quarkus-rest-jackson'
+
+    // --- Model providers -----------------------------------------------------
+    // OpenAI-compatible provider: used for OpenAI itself, but ALSO for
+    // Kimi (Moonshot AI) and Gemini, since both expose OpenAI-compatible endpoints.
+    implementation 'io.quarkiverse.langchain4j:quarkus-langchain4j-openai'
+    // Native Anthropic provider (Claude models)
+    implementation 'io.quarkiverse.langchain4j:quarkus-langchain4j-anthropic'
+    // Native Mistral AI provider
+    implementation 'io.quarkiverse.langchain4j:quarkus-langchain4j-mistral-ai'
+
+    // --- RAG -----------------------------------------------------------------
+    // Easy RAG: point it at a folder of documents and you get ingestion +
+    // retrieval wired into your AI services automatically.
+    implementation 'io.quarkiverse.langchain4j:quarkus-langchain4j-easy-rag'
+    // In-process (local, ONNX-based) embedding model, so RAG works identically
+    // no matter which remote chat provider you switch to. No embedding API keys needed.
+    implementation 'dev.langchain4j:langchain4j-embeddings-bge-small-en-q'
+
+    // --- MCP -----------------------------------------------------------------
+    // Model Context Protocol client: lets the model use tools exposed by any MCP server.
+    implementation 'io.quarkiverse.langchain4j:quarkus-langchain4j-mcp'
+
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.rest-assured:rest-assured'
+}
+
+group = 'be.maartenvandeperre'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+test {
+    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}

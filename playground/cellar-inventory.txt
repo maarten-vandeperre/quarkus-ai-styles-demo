@@ -1,0 +1,10 @@
+The Quarkus Tap - Cellar inventory (last stock count: 2026-07-15)
+
+gin:              4 bottles
+tonic:           12 bottles
+vodka:            0 bottles  (ORDERED - delivery expected Tuesday)
+coffee liqueur:   1 bottle
+sweet vermouth:   3 bottles
+bitter:           2 bottles
+lime cordial:     5 bottles
+non-alcoholic aperitif: 6 bottles

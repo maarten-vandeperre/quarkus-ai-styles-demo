@@ -1,0 +1,4 @@
+Suppliers:
+- Spirits: Van den Broeck Dranken, Antwerp - orders@vdbdranken.example - delivery Tue/Fri
+- Fresh produce: De Groene Markt, Berchem - daily before 10:00
+- Coffee: Roast Republic, Gent - weekly, Wednesdays
