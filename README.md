@@ -19,14 +19,15 @@ so you can fire the same question at each endpoint and compare what actually hap
 - Java 25 (the Gradle toolchain will download one if needed)
 - Node.js 18+ (only for the `/ai/mcp` endpoint: it launches the reference
   filesystem MCP server via `npx @modelcontextprotocol/server-filesystem`)
-- An API key for at least one of the five supported providers
+- An API key for at least one of the cloud providers, **or** a local
+  [Ollama](https://ollama.com) install (no key needed)
 
 ## Switching providers
 
 Open `src/main/resources/application.properties` and change **one line**:
 
 ```properties
-quarkus.profile=openai   # openai | anthropic | mistral | kimi | gemini
+quarkus.profile=openai   # openai | anthropic | mistral | kimi | gemini | ollama
 ```
 
 Each value activates a Quarkus configuration profile that sets the LangChain4j
@@ -39,14 +40,15 @@ For a production build, the provider is a build-time choice:
 ```
 
 Design note: OpenAI, Kimi and Gemini all go through the `quarkus-langchain4j-openai`
-extension (Kimi and Gemini expose OpenAI-compatible endpoints), while Anthropic and
-Mistral use their native extensions. Your application code never changes — the AI
-service interfaces are provider-agnostic. That is the whole point.
+extension (Kimi and Gemini expose OpenAI-compatible endpoints), while Anthropic,
+Mistral and Ollama each use their own native extension. Your application code never
+changes — the AI service interfaces are provider-agnostic. That is the whole point.
 
-## Getting the API keys
+## Setting up providers
 
 Export the key for the provider you selected; the properties file reads them
 from environment variables so nothing sensitive lands in git.
+Ollama runs locally and needs no API key — see the dedicated section below.
 
 ### OpenAI
 1. Go to <https://platform.openai.com>, sign in, open **Settings → API keys**.
@@ -78,6 +80,34 @@ from environment variables so nothing sensitive lands in git.
 2. `export GEMINI_API_KEY=AIza...`
 3. Model configured: `gemini-2.5-flash`. We use Gemini's OpenAI-compatible
    endpoint (`.../v1beta/openai`), so no Google Cloud project setup is required.
+
+### Ollama (local — no API key needed)
+
+Ollama lets you run open models entirely on your machine.
+This demo is pre-configured for **Gemma 4 12B** (~7.6 GB download, runs on 16 GB RAM).
+
+1. Install Ollama from <https://ollama.com> (macOS, Linux, Windows).
+2. Pull the model:
+   ```bash
+   ollama pull gemma4:12b
+   ```
+3. Verify it is running:
+   ```bash
+   ollama list          # should show gemma4:12b
+   ollama run gemma4:12b "Hello!"   # quick smoke test, then /bye to exit
+   ```
+4. Set the profile: `quarkus.profile=ollama` — no environment variable needed.
+5. The Ollama server starts automatically on `http://localhost:11434` when you
+   run any `ollama` command. If Quarkus cannot connect, make sure the server is
+   up (`ollama serve` in a separate terminal).
+
+To use a different model, change `%ollama.quarkus.langchain4j.ollama.chat-model.model-name`
+in `application.properties`. Any model from the [Ollama library](https://ollama.com/library)
+works (e.g. `llama4:scout`, `qwen3:8b`, `mistral:latest`).
+
+> **Tip — Apple Silicon**: if you are on an M-series Mac, the MLX-optimised
+> variant `gemma4:12b-mlx` may give better throughput. Pull it with
+> `ollama pull gemma4:12b-mlx` and update the model name accordingly.
 
 ## Running
 

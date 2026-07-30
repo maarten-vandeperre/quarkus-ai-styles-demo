@@ -23,6 +23,8 @@ dependencies {
     implementation 'io.quarkiverse.langchain4j:quarkus-langchain4j-anthropic'
     // Native Mistral AI provider
     implementation 'io.quarkiverse.langchain4j:quarkus-langchain4j-mistral-ai'
+    // Native Ollama provider (local models)
+    implementation 'io.quarkiverse.langchain4j:quarkus-langchain4j-ollama'
 
     // --- RAG -----------------------------------------------------------------
     // Easy RAG: point it at a folder of documents and you get ingestion +
