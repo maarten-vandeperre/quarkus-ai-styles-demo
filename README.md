@@ -184,7 +184,7 @@ vodka is out of stock and refuses/substitutes, and `/ai/mcp` reads
 
 ## Chat UI (Open WebUI)
 
-Open WebUI is a self-hosted chat window. This repo runs it in Docker and points
+Open WebUI is a self-hosted chat window. This repo runs it in Podman or Docker and points
 it at an OpenAI-compatible API on the Quarkus app (`/v1/models` and
 `/v1/chat/completions`). Each pattern is a model:
 
@@ -210,8 +210,8 @@ out of the menu, the stock tools, and the cellar files.
 2. In another terminal, from this directory:
 
    ```bash
-   docker compose up -d
-   # Podman: podman compose up -d
+   # Docker: compodockerse up -d
+   podman compose up -d # Podman
    ```
 
 3. Open <http://localhost:3000>, choose `plain`, `rag`, `agent`, or `mcp`,
@@ -235,6 +235,9 @@ start. After you edit them, recreate that volume:
 ```bash
 docker compose down -v
 docker compose up -d
+# Podman 
+podman compose down -v
+podman compose up -d
 ```
 
 The same API works without the UI:
@@ -264,8 +267,8 @@ curl -s localhost:8080/v1/chat/completions \
   that the `playground` folder exists relative to the working directory.
 - **Open WebUI shows no models**: it loads them from
   `http://host.docker.internal:8080/v1/models`. Start `./gradlew quarkusDev`
-  first, then `docker compose restart`. If you changed `compose.yaml` and the
-  UI still has the old connection, reset the volume with `docker compose down -v`.
+  first, then `podman compose restart`. If you changed `compose.yaml` and the
+  UI still has the old connection, reset the volume with `podman compose down -v`.
 - **Chat title stays "New Chat"**: the title task expects a raw JSON object.
   The conversation itself still works when the model adds extra text around it.
 - **Tool calling quality differs per provider/model**: smaller or older models
