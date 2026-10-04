@@ -13,6 +13,11 @@ so you can fire the same question at each endpoint and compare what actually hap
 | `POST /ai/rag`   | RAG (Easy RAG)       | `RagAssistant`                 |
 | `POST /ai/agent` | Agentic / tool calls | `AgentAssistant` + `BarTools`  |
 | `POST /ai/mcp`   | MCP client           | `McpAssistant`                 |
+| `POST /v1/chat/completions` | Same four patterns, as a chat | `OpenAiCompatResource` |
+
+The chat endpoint speaks the OpenAI API, so [Open WebUI](#chat-ui-open-webui)
+can sit in front of the app. The model you pick (`plain`, `rag`, `agent`, `mcp`)
+selects the row above.
 
 ## Prerequisites
 
@@ -21,6 +26,7 @@ so you can fire the same question at each endpoint and compare what actually hap
   filesystem MCP server via `npx @modelcontextprotocol/server-filesystem`)
 - An API key for at least one of the cloud providers, **or** a local
   [Ollama](https://ollama.com) install (no key needed)
+- Docker or Podman, only for the Open WebUI chat (the curl endpoints run without it)
 
 ## Switching providers
 
@@ -141,6 +147,71 @@ Compare answers: `/ai/plain` gives you a generic espresso martini recipe,
 vodka is out of stock and refuses/substitutes, and `/ai/mcp` reads
 `playground/cellar-inventory.txt` through the MCP filesystem server.
 
+## Chat UI (Open WebUI)
+
+Open WebUI is a self-hosted chat window. This repo runs it in Docker and points
+it at an OpenAI-compatible API on the Quarkus app (`/v1/models` and
+`/v1/chat/completions`). Each pattern is a model:
+
+| Model | Same assistant as |
+|-------|-------------------|
+| `plain` | `POST /ai/plain` |
+| `rag` | `POST /ai/rag` |
+| `agent` | `POST /ai/agent` |
+| `mcp` | `POST /ai/mcp` |
+
+The active `quarkus.profile` is the provider behind every model. Replies are
+prefixed with that profile name, same as the curl endpoints. A follow-up
+message includes the conversation so far. Open WebUI's own side tasks (chat
+title, tags, follow-up suggestions) go to a small utility prompt, so they stay
+out of the menu, the stock tools, and the cellar files.
+
+1. Start Quarkus and leave it on port 8080:
+
+   ```bash
+   ./gradlew quarkusDev
+   ```
+
+2. In another terminal, from this directory:
+
+   ```bash
+   docker compose up -d
+   # Podman: podman compose up -d
+   ```
+
+3. Open <http://localhost:3000>, choose `plain`, `rag`, `agent`, or `mcp`,
+   and ask the same question you would send with curl.
+
+The container calls the host at `http://host.docker.internal:8080/v1`.
+If Quarkus is on another port, set `QUARKUS_OPENAI_BASE_URL` before `docker compose up`
+(for example `http://host.docker.internal:8081/v1`).
+The key in `compose.yaml` (`sk-local`) is a placeholder; the shim accepts any
+key. Authentication on the chat page is off so a fresh volume opens straight
+into the conversation. Keep ports 3000 and 8080 on your machine — the chat
+endpoint does not check credentials.
+
+`agent` and `mcp` finish their tool calls before the first token shows up;
+the reply is then written out as a stream. Open WebUI built-in tools (web
+search and the like) are separate from `BarTools` and the cellar MCP server.
+
+Settings from `compose.yaml` are copied into the `open-webui` volume on first
+start. After you edit them, recreate that volume:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+The same API works without the UI:
+
+```bash
+curl -s localhost:8080/v1/models
+
+curl -s localhost:8080/v1/chat/completions \
+     -H 'Content-Type: application/json' \
+     -d '{"model":"rag","messages":[{"role":"user","content":"Do you serve an espresso martini, and what is in it?"}]}'
+```
+
 ## Notes & troubleshooting
 
 - **Versions**: built against Quarkus 3.37.3 with quarkus-langchain4j versions
@@ -156,6 +227,12 @@ vodka is out of stock and refuses/substitutes, and `/ai/mcp` reads
   on first use; subsequent requests are fast.
 - **MCP endpoint fails**: make sure `npx` is on the PATH of the JVM process and
   that the `playground` folder exists relative to the working directory.
+- **Open WebUI shows no models**: it loads them from
+  `http://host.docker.internal:8080/v1/models`. Start `./gradlew quarkusDev`
+  first, then `docker compose restart`. If you changed `compose.yaml` and the
+  UI still has the old connection, reset the volume with `docker compose down -v`.
+- **Chat title stays "New Chat"**: the title task expects a raw JSON object.
+  The conversation itself still works when the model adds extra text around it.
 - **Tool calling quality differs per provider/model**: smaller or older models
   are noticeably worse at deciding when and how to call tools. If `/ai/agent`
   misbehaves on one provider, try the same request on another — that contrast

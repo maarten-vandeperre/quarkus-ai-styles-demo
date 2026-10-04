@@ -1,0 +1,37 @@
+# Chat UI for the Quarkus demo.
+#
+# Start the app on the host first (./gradlew quarkusDev, port 8080), then:
+#   docker compose up -d
+# Open http://localhost:3000 and pick a model: plain, rag, agent, or mcp.
+#
+# The API key below is a placeholder. The Quarkus shim accepts any key.
+# WEBUI_AUTH is off so a fresh volume opens straight into the chat.
+# Environment settings are stored in the volume on first start; after you
+# change them, recreate it with: docker compose down -v && docker compose up -d
+
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: quarkus-ai-open-webui
+    ports:
+      - "3000:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      ENABLE_OPENAI_API: "True"
+      ENABLE_OLLAMA_API: "False"
+      # Override when Quarkus is not on port 8080:
+      #   QUARKUS_OPENAI_BASE_URL=http://host.docker.internal:8081/v1 docker compose up -d
+      OPENAI_API_BASE_URL: ${QUARKUS_OPENAI_BASE_URL:-http://host.docker.internal:8080/v1}
+      OPENAI_API_KEY: sk-local
+      WEBUI_AUTH: "False"
+      WEBUI_NAME: Quarkus AI Styles
+      DEFAULT_MODELS: plain
+      MODEL_ORDER_LIST: '["plain","rag","agent","mcp"]'
+      ENABLE_VERSION_UPDATE_CHECK: "False"
+    volumes:
+      - open-webui:/app/backend/data
+    restart: unless-stopped
+
+volumes:
+  open-webui:
