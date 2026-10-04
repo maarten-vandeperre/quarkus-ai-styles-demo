@@ -25,7 +25,8 @@ selects the row above.
 - Node.js 18+ (only for the `/ai/mcp` endpoint: it launches the reference
   filesystem MCP server via `npx @modelcontextprotocol/server-filesystem`)
 - An API key for at least one of the cloud providers, **or** a local
-  [Ollama](https://ollama.com) install (no key needed)
+  [Ollama](https://ollama.com) install, **or** [Podman Desktop](https://podman-desktop.io)
+  with the AI Lab extension serving Qwen (no key needed)
 - Docker or Podman, only for the Open WebUI chat (the curl endpoints run without it)
 
 ## Switching providers
@@ -33,11 +34,11 @@ selects the row above.
 Open `src/main/resources/application.properties` and change **one line**:
 
 ```properties
-quarkus.profile=openai   # openai | anthropic | mistral | kimi | gemini | ollama
+quarkus.profile=openai   # openai | anthropic | mistral | kimi | gemini | ollama | qwen
 ```
 
 Each value activates a Quarkus configuration profile that sets the LangChain4j
-provider, model name and (for Kimi and Gemini) an OpenAI-compatible `base-url`.
+provider, model name and (for Kimi, Gemini and Qwen) an OpenAI-compatible `base-url`.
 In dev mode (`./gradlew quarkusDev`) the change is picked up on live reload.
 For a production build, the provider is a build-time choice:
 
@@ -45,8 +46,8 @@ For a production build, the provider is a build-time choice:
 ./gradlew build -Dquarkus.profile=anthropic
 ```
 
-Design note: OpenAI, Kimi and Gemini all go through the `quarkus-langchain4j-openai`
-extension (Kimi and Gemini expose OpenAI-compatible endpoints), while Anthropic,
+Design note: OpenAI, Kimi, Gemini and Qwen all go through the `quarkus-langchain4j-openai`
+extension (Kimi, Gemini and Podman AI Lab expose OpenAI-compatible endpoints), while Anthropic,
 Mistral and Ollama each use their own native extension. Your application code never
 changes — the AI service interfaces are provider-agnostic. That is the whole point.
 
@@ -54,7 +55,8 @@ changes — the AI service interfaces are provider-agnostic. That is the whole p
 
 Export the key for the provider you selected; the properties file reads them
 from environment variables so nothing sensitive lands in git.
-Ollama runs locally and needs no API key — see the dedicated section below.
+Ollama and Qwen on Podman AI Lab run locally and need no API key — see the
+dedicated sections below.
 
 ### OpenAI
 1. Go to <https://platform.openai.com>, sign in, open **Settings → API keys**.
@@ -114,6 +116,39 @@ works (e.g. `llama4:scout`, `qwen3:8b`, `mistral:latest`).
 > **Tip — Apple Silicon**: if you are on an M-series Mac, the MLX-optimised
 > variant `gemma4:12b-mlx` may give better throughput. Pull it with
 > `ollama pull gemma4:12b-mlx` and update the model name accordingly.
+
+### Qwen (Podman Desktop AI Lab — local, no API key needed)
+
+[Podman AI Lab](https://podman-desktop.io/docs/ai-lab/start-inference-server) runs a
+model in a container and exposes an OpenAI-compatible chat API. This profile
+is set up for **Qwen3 4B** (`qwen/qwen3-4b-GGUF`) on port **35000**.
+
+1. Install [Podman Desktop](https://podman-desktop.io) and, from its Extensions
+   catalog, install **Podman AI Lab**.
+2. In AI Lab, open **Catalog**, download **Qwen3 4B** (`qwen/qwen3-4b-GGUF`).
+3. Open **Services → New Model Service**, select that model, set the port to
+   `35000`, and create the service. Wait until the service details page shows
+   the inference URL.
+4. Set the profile: `quarkus.profile=qwen` — no environment variable needed.
+   The OpenAI client still sends a key; the properties file uses the dummy
+   value `sk-podman`, which the local server accepts.
+
+If Service Details shows a different port, point the app at it without editing
+the file:
+
+```bash
+export PODMAN_AI_BASE_URL=http://localhost:<port>/v1
+```
+
+Podman AI Lab serves one model at a time, whichever service is running. To
+use another catalog model (for example the Qwen3 4B thinking variant), change
+`%qwen.quarkus.langchain4j.openai.chat-model.model-name` to the name shown in
+Service Details. Local inference is slower than the cloud providers, so the
+profile waits up to 180 seconds per model call.
+
+> **Tip — macOS**: creating the model service may offer a GPU-enabled Podman
+> machine. Use it when you can; otherwise the model runs on CPU and the first
+> reply takes longer.
 
 ## Running
 
