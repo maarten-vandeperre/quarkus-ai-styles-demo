@@ -1,0 +1,20 @@
+# DiffusionGemma on OpenShift AI (KServe RawDeployment + vLLM).
+#
+# Every setting lives in these manifests, so the same folder works for
+#   oc apply -k deploy/openshift/diffusiongemma -n <namespace>
+# and for an Argo CD Application (see deploy/argocd/).
+#
+# No namespace is set here on purpose: the CLI (-n) or the Argo CD
+# destination decides where it lands.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: diffusiongemma
+      app.kubernetes.io/part-of: quarkus-ai-styles-demo
+    includeSelectors: false
+
+resources:
+  - servingruntime.yaml
+  - inferenceservice.yaml

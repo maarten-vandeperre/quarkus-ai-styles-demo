@@ -1,0 +1,68 @@
+# vLLM runtime with DiffusionGemma support.
+#
+# The Red Hat AI Inference Server runtime shipped with OpenShift AI
+# (registry.redhat.io/rhaiis/vllm-cuda-rhel9) predates DiffusionGemma, so
+# this runtime uses the upstream vLLM image. DiffusionGemma needs vLLM
+# 0.24.0+ (https://recipes.vllm.ai/Google/diffusiongemma-26B-A4B-it); the
+# native OpenAI Decisions API (POST /v1/decisions, vllm-project/vllm#60465)
+# is newer than the recipe's `gemma` tag, hence `nightly`. Both tags move:
+# pin a digest (image: vllm/vllm-openai@sha256:...) once a build works for you.
+#
+# Generic vLLM flags live here; model flags live on the InferenceService.
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: vllm-diffusiongemma-runtime
+  annotations:
+    openshift.io/display-name: vLLM (DiffusionGemma) NVIDIA GPU ServingRuntime
+    opendatahub.io/apiProtocol: REST
+    opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    opendatahub.io/dashboard: "true"
+spec:
+  multiModel: false
+  supportedModelFormats:
+    - name: vLLM
+      autoSelect: true
+  annotations:
+    prometheus.io/port: "8080"
+    prometheus.io/path: /metrics
+  containers:
+    - name: kserve-container
+      image: docker.io/vllm/vllm-openai:nightly
+      command:
+        - python3
+        - -m
+        - vllm.entrypoints.openai.api_server
+      args:
+        - --port=8080
+        - --model=/mnt/models
+        - --served-model-name={{.Name}}
+      env:
+        # OpenShift runs the container with a random UID: keep every cache
+        # in writable /tmp instead of /root.
+        - name: HOME
+          value: /tmp
+        - name: HF_HOME
+          value: /tmp/hf_home
+        # Weights are downloaded by the KServe storage initializer into
+        # /mnt/models; vLLM itself must not reach out to Hugging Face.
+        - name: HF_HUB_OFFLINE
+          value: "1"
+        - name: VLLM_NO_USAGE_STATS
+          value: "1"
+        # DiffusionGemma runs on vLLM's model runner v2.
+        - name: VLLM_USE_V2_MODEL_RUNNER
+          value: "1"
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+  volumes:
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 2Gi

@@ -1,0 +1,29 @@
+# Builds and runs the app in one Dockerfile, so OpenShift can build it from
+# Git (deploy/openshift/app/buildconfig.yaml) without a local toolchain.
+#
+#   podman build -f src/main/docker/Dockerfile.multistage -t quarkus-ai-styles-demo .
+
+FROM registry.access.redhat.com/ubi9/openjdk-25:1.24 AS build
+WORKDIR /build
+COPY --chown=185 gradlew settings.gradle build.gradle gradle.properties ./
+COPY --chown=185 gradle gradle
+RUN ./gradlew --no-daemon --version
+COPY --chown=185 src src
+RUN ./gradlew --no-daemon build -x test
+
+FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
+WORKDIR /deployments
+COPY --from=build --chown=185 /build/build/quarkus-app/lib/ /deployments/lib/
+COPY --from=build --chown=185 /build/build/quarkus-app/*.jar /deployments/
+COPY --from=build --chown=185 /build/build/quarkus-app/app/ /deployments/app/
+COPY --from=build --chown=185 /build/build/quarkus-app/quarkus/ /deployments/quarkus/
+# Easy RAG and the MCP server read these paths relative to the working directory.
+COPY --chown=185 src/main/resources/rag-docs /deployments/src/main/resources/rag-docs
+COPY --chown=185 playground /deployments/playground
+
+EXPOSE 8080
+USER 185
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+ENV JAVA_APP_DIR="/deployments"
+ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
+ENTRYPOINT [ "/opt/jboss/container/java/run/run-java.sh" ]

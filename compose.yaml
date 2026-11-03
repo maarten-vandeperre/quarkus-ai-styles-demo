@@ -1,13 +1,13 @@
 # Chat UI for the Quarkus demo.
 #
 # Start the app on the host first (./gradlew quarkusDev, port 8080), then:
-#   docker compose up -d
+#   podman compose up -d      (or: docker compose up -d)
 # Open http://localhost:3000 and pick a model: plain, rag, agent, or mcp.
 #
 # The API key below is a placeholder. The Quarkus shim accepts any key.
 # WEBUI_AUTH is off so a fresh volume opens straight into the chat.
 # Environment settings are stored in the volume on first start; after you
-# change them, recreate it with: docker compose down -v && docker compose up -d
+# change them, recreate it with: podman compose down -v && podman compose up -d
 
 services:
   open-webui:
@@ -21,7 +21,7 @@ services:
       ENABLE_OPENAI_API: "True"
       ENABLE_OLLAMA_API: "False"
       # Override when Quarkus is not on port 8080:
-      #   QUARKUS_OPENAI_BASE_URL=http://host.docker.internal:8081/v1 docker compose up -d
+      #   QUARKUS_OPENAI_BASE_URL=http://host.docker.internal:8081/v1 podman compose up -d
       OPENAI_API_BASE_URL: ${QUARKUS_OPENAI_BASE_URL:-http://host.docker.internal:8080/v1}
       OPENAI_API_KEY: sk-local
       WEBUI_AUTH: "False"
@@ -29,6 +29,8 @@ services:
       DEFAULT_MODELS: plain
       MODEL_ORDER_LIST: '["plain","rag","agent","mcp"]'
       ENABLE_VERSION_UPDATE_CHECK: "False"
+      # Hide the built-in "arena-model" so only the four patterns are listed.
+      ENABLE_EVALUATION_ARENA_MODELS: "False"
     volumes:
       - open-webui:/app/backend/data
     restart: unless-stopped

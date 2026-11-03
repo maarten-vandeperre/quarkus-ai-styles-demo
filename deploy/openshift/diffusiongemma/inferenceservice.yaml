@@ -1,0 +1,63 @@
+# DiffusionGemma 26B-A4B (FP8, Red Hat AI validated) served by vLLM.
+#
+# Sizing: FP8 weights are ~26 GB, so this needs ONE GPU with >= 40 GB
+# (L40S 48 GB, A100/H100 80 GB). A 24 GB L4 is too small for this model.
+# The Developer Sandbox has a GPU quota of 0: there the pod is never created.
+#
+# The served model name is the InferenceService name: `diffusiongemma`.
+# Endpoints (OpenAI API, including POST /v1/decisions):
+#   in cluster: http://diffusiongemma-predictor.<namespace>.svc.cluster.local/v1
+#   outside:    https://<route host>/v1   (oc get route -l serving.kserve.io/inferenceservice=diffusiongemma)
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: diffusiongemma
+  annotations:
+    openshift.io/display-name: DiffusionGemma 26B-A4B FP8 (decision model)
+    serving.kserve.io/deploymentMode: RawDeployment
+    # The demo app calls the model without a token. Set to "true" and give
+    # the app a ServiceAccount token to put the model behind authentication.
+    security.opendatahub.io/enable-auth: "false"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    opendatahub.io/dashboard: "true"
+    # Ask KServe to create an OpenShift Route for the predictor.
+    networking.kserve.io/visibility: exposed
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 1
+    deploymentStrategy:
+      type: Recreate
+    automountServiceAccountToken: false
+    model:
+      modelFormat:
+        name: vLLM
+      runtime: vllm-diffusiongemma-runtime
+      # Downloaded by the KServe storage initializer (Apache 2.0, not gated).
+      storageUri: hf://RedHatAI/diffusiongemma-26B-A4B-it-FP8-dynamic
+      args:
+        # Flags from the vLLM recipe and the RedHatAI model card.
+        - --trust-remote-code
+        # Diffusion state buffers scale with max-num-seqs x canvas x vocab;
+        # above 4 the recipe reports CUDA OOM.
+        - --max-num-seqs=4
+        # Full context is 256K; the coffee decision prompts are tiny.
+        - --max-model-len=32768
+        - --gpu-memory-utilization=0.85
+        # The checkpoint's generation_config.json caps max_tokens at 256.
+        - --generation-config=vllm
+        - '--hf-overrides={"diffusion_sampler": "entropy_bound", "diffusion_entropy_bound": 0.1}'
+      resources:
+        requests:
+          cpu: "4"
+          memory: 32Gi
+          nvidia.com/gpu: "1"
+        limits:
+          cpu: "8"
+          memory: 48Gi
+          nvidia.com/gpu: "1"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule

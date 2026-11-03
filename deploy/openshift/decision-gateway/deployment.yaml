@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: decision-gateway
+  labels:
+    app.kubernetes.io/name: decision-gateway
+    app.kubernetes.io/component: decision-model
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: decision-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: decision-gateway
+        app.kubernetes.io/component: decision-model
+    spec:
+      # The pod's service account token authenticates to the shared models
+      # (OpenShift AI enable-auth); gateway.py re-reads it on every call.
+      automountServiceAccountToken: true
+      containers:
+        - name: gateway
+          image: registry.access.redhat.com/ubi9/python-312:1
+          command: ["python3", "-I", "/opt/gateway/gateway.py"]
+          envFrom:
+            - configMapRef:
+                name: decision-gateway-config
+          env:
+            - name: PORT
+              value: "8080"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: script
+              mountPath: /opt/gateway
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: decision-gateway-script

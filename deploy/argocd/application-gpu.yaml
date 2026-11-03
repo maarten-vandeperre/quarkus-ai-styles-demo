@@ -1,0 +1,32 @@
+# Argo CD (OpenShift GitOps) Application for the 'gpu' overlay.
+# GPU cluster with OpenShift AI: app + DiffusionGemma (vLLM) + decision gateway.
+# Adjust targetRevision and destination.namespace to your setup.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quarkus-ai-styles-demo-gpu
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/maarten-vandeperre/quarkus-ai-styles-demo.git
+    targetRevision: main
+    path: deploy/openshift/overlays/gpu
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quarkus-ai-styles-demo
+  # The image trigger on the Deployment replaces the image with the digest of
+  # each new build; that is expected, not drift.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: quarkus-ai-styles-demo
+      jqPathExpressions:
+        - .spec.template.spec.containers[].image
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - RespectIgnoreDifferences=true
+      - CreateNamespace=true

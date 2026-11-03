@@ -1,0 +1,28 @@
+# Decision gateway: OpenAI Decisions API (POST /v1/decisions) in front of a
+# vLLM chat endpoint that does not serve it itself. See gateway.py.
+#
+# Runs the script from a ConfigMap on the stock UBI Python image: no image
+# build. The defaults target the Developer Sandbox's shared Qwen3 8B; the
+# overlays override decision-gateway-config.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: quarkus-ai-styles-demo
+    includeSelectors: false
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+configMapGenerator:
+  - name: decision-gateway-script
+    files:
+      - gateway.py
+  - name: decision-gateway-config
+    literals:
+      - BACKEND_URL=https://isvc-qwen3-8b-fp8-predictor.sandbox-shared-models.svc.cluster.local:8443/v1
+      - BACKEND_MODEL=isvc-qwen3-8b-fp8
+      - STRUCTURED_OUTPUTS=structured_outputs
+      - BACKEND_TIMEOUT=60

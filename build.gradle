@@ -10,7 +10,10 @@ repositories {
 
 dependencies {
     implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
-    implementation enforcedPlatform("${quarkusPlatformGroupId}:quarkus-langchain4j-bom:${quarkusPlatformVersion}")
+    // quarkus-langchain4j and LangChain4j are versioned ahead of the platform
+    // for decision-model support: see gradle.properties.
+    implementation enforcedPlatform("dev.langchain4j:langchain4j-bom:${langchain4jVersion}")
+    implementation platform("io.quarkiverse.langchain4j:quarkus-langchain4j-bom:${quarkusLangchain4jVersion}")
 
     // REST layer
     implementation 'io.quarkus:quarkus-rest-jackson'
@@ -33,6 +36,14 @@ dependencies {
     // In-process (local, ONNX-based) embedding model, so RAG works identically
     // no matter which remote chat provider you switch to. No embedding API keys needed.
     implementation 'dev.langchain4j:langchain4j-embeddings-bge-small-en-q'
+
+    // --- Decision models -----------------------------------------------------
+    // DecisionModel API + declarative DecisionServices (@Decide). The OpenAI
+    // implementation (langchain4j-open-ai, pulled in by the openai extension)
+    // speaks the OpenAI Decisions API (POST /v1/decisions).
+    implementation 'dev.langchain4j:langchain4j'
+    // HTTP client for the decision model (see DefaultClientOpenAiDecisionModel)
+    implementation 'dev.langchain4j:langchain4j-http-client-jdk'
 
     // --- MCP -----------------------------------------------------------------
     // Model Context Protocol client: lets the model use tools exposed by any MCP server.

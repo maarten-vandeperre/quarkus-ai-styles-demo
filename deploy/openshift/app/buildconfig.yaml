@@ -1,0 +1,35 @@
+# Builds the app from Git with src/main/docker/Dockerfile.multistage.
+# A build starts when this BuildConfig is created (ConfigChange). To build
+# your local, uncommitted tree instead: deploy/scripts/deploy.sh --local-source
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: quarkus-ai-styles-demo
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/maarten-vandeperre/quarkus-ai-styles-demo.git
+      ref: main
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: src/main/docker/Dockerfile.multistage
+  output:
+    to:
+      kind: ImageStreamTag
+      name: quarkus-ai-styles-demo:latest
+  # A deadline puts build pods under the sandbox's build quota (Terminating scope).
+  completionDeadlineSeconds: 1800
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  runPolicy: SerialLatestOnly
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2
+  triggers:
+    - type: ConfigChange

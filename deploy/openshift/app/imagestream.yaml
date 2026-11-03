@@ -1,0 +1,8 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: quarkus-ai-styles-demo
+spec:
+  lookupPolicy:
+    # Lets the Deployment refer to "quarkus-ai-styles-demo:latest" directly.
+    local: true

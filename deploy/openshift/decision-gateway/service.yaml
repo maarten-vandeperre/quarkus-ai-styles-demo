@@ -1,0 +1,15 @@
+# Cluster-internal only: the gateway forwards with the pod's own token, so it
+# is not exposed with a Route. Locally: oc port-forward svc/decision-gateway 8000:8080
+apiVersion: v1
+kind: Service
+metadata:
+  name: decision-gateway
+  labels:
+    app.kubernetes.io/name: decision-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: decision-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -1,0 +1,24 @@
+# Red Hat Developer Sandbox (no GPU quota):
+#   app -> decision-gateway -> shared Qwen3 8B (vLLM, sandbox-shared-models)
+#
+#   oc apply -k deploy/openshift/overlays/sandbox -n <namespace>
+# Other shared models: isvc-granite-31-8b-fp8, isvc-nemotron-nano-9b-v2-fp8
+# (change BACKEND_URL and BACKEND_MODEL together).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../decision-gateway
+  - ../../app
+
+configMapGenerator:
+  - name: decision-gateway-config
+    behavior: merge
+    literals:
+      - BACKEND_URL=https://isvc-qwen3-8b-fp8-predictor.sandbox-shared-models.svc.cluster.local:8443/v1
+      - BACKEND_MODEL=isvc-qwen3-8b-fp8
+  - name: quarkus-app-config
+    behavior: merge
+    literals:
+      - DECISION_BASE_URL=http://decision-gateway:8080/v1
+      - DECISION_MODEL=qwen3-8b

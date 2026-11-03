@@ -1,0 +1,22 @@
+# The Quarkus app, built on the cluster from Git (BuildConfig -> ImageStream).
+# Overlays set where POST /ai/decision sends its questions (quarkus-app-config).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: quarkus-ai-styles-demo
+    includeSelectors: false
+
+resources:
+  - imagestream.yaml
+  - buildconfig.yaml
+  - deployment.yaml
+  - service.yaml
+  - route.yaml
+
+configMapGenerator:
+  - name: quarkus-app-config
+    literals:
+      - DECISION_BASE_URL=http://decision-gateway:8080/v1
+      - DECISION_MODEL=decision
