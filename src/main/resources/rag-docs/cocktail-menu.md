@@ -1,11 +1,27 @@
-# The Quarkus Tap - Cocktail Menu (Summer 2026)
+# The Quarkus Tap - Cocktail Menu (Fall 2026)
 
 ## Signature cocktails
 
-### Espresso Martini "Supersonic"
-- Ingredients: vodka (5 cl), coffee liqueur (2.5 cl), freshly pulled espresso (3 cl)
-- Price: EUR 12.50
-- Note: served with three coffee beans; decaf variant available after 22:00.
+### Blue Fall
+- Ingredients: vodka, blue curaçao, lime
+- Price: EUR 12.00
+- Note: a vibrant blue cocktail with a refreshing citrus finish.
+
+### Yellow Java
+- Ingredients: rum, pineapple, vanilla, citrus
+- Price: EUR 13.00
+- Note: a bright yellow tropical cocktail, garnished with rosemary.
+
+### Maarten's Martini
+- Type: Signature Espresso Martini variation
+- Ingredients: gin, espresso, coffee liqueur, raspberry, lime
+- Price: EUR 12.00
+- Note: : a luxurious ruby-red martini with a delicate foam layer, a pink sugar rim, edible violet flower, orange twist and a crisp caramel garnish. decaf variant available after 22:00.
+
+### Lutske's Luxe
+- Ingredients: vodka, violet, elderflower, lemon
+- Price: EUR 12.00
+- Note: an elegant violet cocktail with floral notes.
 
 ### GraalVM Gimlet
 - Ingredients: gin (5 cl), lime cordial (2 cl), fresh lime juice (1 cl)
@@ -15,6 +31,18 @@
 - Ingredients: gin (3 cl), sweet vermouth (3 cl), bitter (3 cl)
 - Price: EUR 12.00
 - Note: pre-batched and frozen, served in under 3 seconds ("startup time matters").
+
+## House cocktails
+
+### Espresso Martini
+- Ingredients: vodka, espresso, coffee liqueur
+- Price: EUR 12.00
+- Note: our classic espresso martini.
+
+### Sex on the Beach
+- Ingredients: vodka, peach, cranberry, orange
+- Price: EUR 12.00
+- Note: a classic fruity cocktail.
 
 ## Non-alcoholic
 

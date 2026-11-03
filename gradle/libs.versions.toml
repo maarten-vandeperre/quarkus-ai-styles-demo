@@ -1,5 +1,5 @@
 [versions]
-java = "25"
+java = "27"
 gradle = "9.4.0"
 quarkus = "3.37.3"
 junit = "5.12.2"
