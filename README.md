@@ -359,7 +359,8 @@ out of the menu, the stock tools, and the cellar files.
 2. In another terminal, from this directory:
 
    ```bash
-   podman compose up -d
+   # Docker: compodockerse up -d
+   podman compose up -d # Podman
    ```
 
    With Docker: `docker compose up -d`. `podman compose` needs a compose
@@ -390,6 +391,9 @@ Settings from `compose.yaml` are copied into the `open-webui` volume on first
 start. After you edit them, recreate that volume:
 
 ```bash
+docker compose down -v
+docker compose up -d
+# Podman 
 podman compose down -v
 podman compose up -d
 ```
