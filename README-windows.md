@@ -89,11 +89,16 @@ Leave this window open. Quarkus listens on <http://localhost:8080>.
 
 The MCP client starts the filesystem server with `npx`. On Windows, `npx` is
 a batch file (`npx.cmd`), and Java cannot start a batch file by its short
-name. If `/ai/mcp` fails with `Cannot run program "npx"`, stop Quarkus and
-start it again with the `.cmd` name:
+name. The app detects Windows and uses `npx.cmd` automatically
+(`WindowsNpxConfigSource`), so no extra setup is needed.
+
+If the server still cannot start, the MCP client is skipped without an error
+and the model answers without tools, for example *"I don't currently have
+direct access to your cellar files"*. Check the Quarkus log for the MCP
+startup error, and point the app at `npx` explicitly if needed:
 
 ```powershell
-$env:QUARKUS_LANGCHAIN4J_MCP_CELLAR_COMMAND = 'npx.cmd,-y,@modelcontextprotocol/server-filesystem,playground'
+$env:CELLAR_NPX = 'C:\Program Files\nodejs\npx.cmd'
 .\gradlew.bat quarkusDev
 ```
 
