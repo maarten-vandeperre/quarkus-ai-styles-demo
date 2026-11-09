@@ -1,8 +1,18 @@
-# Chat UI for the Quarkus demo.
+# Local companions for the Quarkus demo.
 #
 # Start the app on the host first (./gradlew quarkusDev, port 8080), then:
 #   podman compose up -d      (or: docker compose up -d)
 # Open http://localhost:3000 and pick a model: plain, rag, agent, or mcp.
+#
+#   open-webui        chat UI on http://localhost:3000
+#   decision-gateway  local decision gateway on http://localhost:8000/v1 for
+#                     decision.provider=gemma (application.properties):
+#                     /v1/decisions on top of a chat model on the host's Ollama
+#                       ollama pull gemma4
+#                     Only the gateway: podman compose up -d decision-gateway
+#                     (stop any `oc port-forward ... 8000:8080` first)
+#                     decision.provider=kev needs no gateway: Ollama serves
+#                     kev's decision API itself.
 #
 # The API key below is a placeholder. The Quarkus shim accepts any key.
 # WEBUI_AUTH is off so a fresh volume opens straight into the chat.
@@ -33,6 +43,31 @@ services:
       ENABLE_EVALUATION_ARENA_MODELS: "False"
     volumes:
       - open-webui:/app/backend/data
+    restart: unless-stopped
+
+  decision-gateway:
+    # The same gateway.py as on OpenShift (deploy/openshift/decision-gateway),
+    # standard library only, so a stock Python image runs it.
+    image: docker.io/library/python:3.12-slim
+    container_name: quarkus-ai-decision-gateway
+    command: ["python3", "-I", "/opt/gateway/gateway.py"]
+    ports:
+      - "8000:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PORT: "8080"
+      BACKEND_URL: ${DECISION_OLLAMA_URL:-http://host.docker.internal:11434/v1}
+      # Empty: use the model the app sends (decision.gemma.model-name).
+      # Set DECISION_OLLAMA_MODEL to force one for every request.
+      BACKEND_MODEL: ${DECISION_OLLAMA_MODEL:-}
+      # Ollama has no structured outputs choice; the letter logprobs suffice.
+      STRUCTURED_OUTPUTS: none
+      # Thinking off, so the first token is the answer letter.
+      BACKEND_EXTRA_BODY: '{"reasoning_effort":"none"}'
+      BACKEND_TIMEOUT: "120"
+    volumes:
+      - ./deploy/openshift/decision-gateway/gateway.py:/opt/gateway/gateway.py:ro
     restart: unless-stopped
 
 volumes:

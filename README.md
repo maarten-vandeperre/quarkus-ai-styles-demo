@@ -32,6 +32,61 @@ selects the row above.
   with the AI Lab extension serving Qwen (no key needed)
 - Docker or Podman, only for the Open WebUI chat (the curl endpoints run without it)
 
+## Fully local demo (Ollama, Open WebUI, no API key)
+
+Everything on your laptop: Gemma 4 on Ollama for the four chat patterns,
+Gemma 4 or kev on Ollama for the decision endpoint, Open WebUI as the chat
+window. Needs [Ollama](https://ollama.com), Podman or Docker, and Node.js
+(for `mcp`).
+
+1. Pull the models (once):
+
+   ```bash
+   ollama pull gemma4:12b       # chat model for plain / rag / agent / mcp
+   ollama pull gemma4           # decision model, decision.provider=gemma
+   ollama pull kev:0.8b-q8_0    # decision model, decision.provider=kev
+   ```
+
+2. Pick the providers in `src/main/resources/application.properties`:
+
+   ```properties
+   quarkus.profile=ollama        # chat patterns on Ollama
+   decision.provider=gemma       # or kev
+   ```
+
+   (`decision.provider` is in the "Decision model" block, default `gemma`.)
+
+3. Start Open WebUI and the local decision gateway (Gemma needs it, kev not):
+
+   ```bash
+   podman compose up -d         # or: docker compose up -d
+   ```
+
+   Stop any `oc port-forward ... 8000:8080` first; the gateway uses port 8000.
+
+4. Start the app and leave it running:
+
+   ```bash
+   ./gradlew quarkusDev
+   ```
+
+5. Try it:
+   - Chat: open <http://localhost:3000> and pick `plain`, `rag`, `agent` or `mcp`.
+   - Decision (not in Open WebUI, it returns probabilities, not chat):
+
+     ```bash
+     curl -s -X POST localhost:8080/ai/decision -H 'Content-Type: text/plain' \
+          -d 'Something milky but not too sweet, I have a long meeting ahead'
+     ```
+
+     The `model` field in the answer shows which one replied (`gemma4:latest`
+     or `kev:0.8b-q8_0`).
+
+To switch the decision model live, change `decision.provider` and save:
+dev mode reloads on the next request. Details:
+[Choosing the decision model](#choosing-the-decision-model),
+[Chat UI (Open WebUI)](#chat-ui-open-webui).
+
 ## Switching providers
 
 Open `src/main/resources/application.properties` and change **one line**:
@@ -160,6 +215,11 @@ export OPENAI_API_KEY=sk-...        # or the key matching your chosen profile
 ./gradlew quarkusDev
 ```
 
+The key is only for the four chat patterns below (`quarkus.profile`; the
+`ollama` and `qwen` profiles need none). The decision endpoint does not use
+it: with `decision.provider=gemma` or `kev` everything runs on the local
+Ollama, so for `/ai/decision` alone `./gradlew quarkusDev` is enough.
+
 Then, in another terminal, run the four requests one by one (each block runs
 on its own from IntelliJ's Markdown preview). Windows users: see
 [README-windows.md](README-windows.md) for the PowerShell versions.
@@ -217,13 +277,13 @@ curl -s -X POST localhost:8080/ai/decision -H 'Content-Type: text/plain' \
 This is a **decision model**, not a chat model. A decision model answers typed
 questions (choice, yes/no, score) and returns a probability for each option,
 taken from the model's token probabilities. Nothing is parsed out of
-generated text. It speaks the OpenAI Decisions API (`POST /v1/decisions`).
+generated text.
 
 | Piece | What it does |
 |-------|--------------|
 | `CoffeeDecisionService` | Declarative LangChain4j decision service: `@Decide` + `Choice<CoffeeType>` |
 | `CoffeeType` | The menu; each constant is an option, its `@Description` tells the model what it is |
-| `DecisionModels` | CDI producer for the `DecisionModel` and the decision service |
+| `DecisionModels` | CDI producer for the `DecisionModel` (picked by `decision.provider`) and the decision service |
 | `DefaultClientOpenAiDecisionModel` | LangChain4j's OpenAI decision model on LangChain4j's own HTTP client (see below) |
 
 ### Versions: why the build is ahead of the platform
@@ -233,8 +293,8 @@ Decision models arrived in LangChain4j 1.22.0 (`DecisionModel`,
 integration for OpenAI decision models
 ([quarkiverse PR #3000](https://github.com/quarkiverse/quarkus-langchain4j/pull/3000))
 is merged but not released yet. So the build uses Quarkus 3.40.1 with
-quarkus-langchain4j 1.15.0.CR1, and lifts LangChain4j to 1.22.0
-(`gradle.properties`).
+quarkus-langchain4j 1.15.0.CR1, and lifts LangChain4j to 1.23.0
+(`gradle.properties`). 1.23.0 adds `OllamaDecisionModel`, used for kev.
 
 Until that release:
 
@@ -249,13 +309,36 @@ Until that release:
 After the release, delete both classes and inject
 `@ModelName("decision") DecisionModel`. The properties stay the same.
 
-### Where the decision model runs
+### Choosing the decision model
+
+`decision.provider` in `application.properties` (or `DECISION_PROVIDER`)
+picks one of three:
+
+| Provider | Model | How the app reaches it | Start it with |
+|----------|-------|------------------------|---------------|
+| `gemma` (default) | Gemma 4 8B on the local Ollama | OpenAI Decisions API → local decision gateway → Ollama chat with logprobs | `ollama pull gemma4` and `podman compose up -d decision-gateway` |
+| `kev` | kev on the local Ollama | `OllamaDecisionModel` → Ollama's own decision API (`POST /v1/systemone`), no gateway | `ollama pull kev:0.8b-q8_0` |
+| `openai` | whatever serves `/v1/decisions` | OpenAI Decisions API | the sandbox gateway (`oc port-forward svc/decision-gateway 8000:8080`), vLLM, OpenAI |
+
+The deployed app on OpenShift always uses `openai` (set in
+`deploy/openshift/app/kustomization.yaml`).
 
 | Setting | Default | Meaning |
 |---------|---------|---------|
-| `DECISION_BASE_URL` | `http://localhost:8000/v1` | Decisions API base URL |
-| `DECISION_MODEL` | `decision` | model name sent in the request |
-| `DECISION_API_KEY` | `sk-none` | bearer token |
+| `DECISION_PROVIDER` | `gemma` | `gemma`, `kev` or `openai` |
+| `DECISION_GEMMA_MODEL` | `gemma4:latest` | Ollama model behind the local gateway (any chat model with logprobs) |
+| `DECISION_GEMMA_BASE_URL` | `http://localhost:8000/v1` | local gateway |
+| `DECISION_KEV_MODEL` | `kev:0.8b-q8_0` | kev tag; `kev:9b-q4_K_M` (5.6 GB) is stronger. `*-mlx-*` / `*-nvfp4` tags are Apple Silicon only |
+| `DECISION_KEV_BASE_URL` | `http://localhost:11434` | Ollama |
+| `DECISION_BASE_URL` | `http://localhost:8000/v1` | `openai`: Decisions API base URL |
+| `DECISION_MODEL` | `decision` | `openai`: model name sent in the request |
+| `DECISION_API_KEY` | `sk-none` | `openai`: bearer token |
+
+Measured on 12 coffee requests with a clear answer (MacBook, Ollama 0.40):
+`gemma` 12/12, `kev:0.8b-q8_0` 9/12 with low confidence (0.2–0.8). kev is
+built for decisions but the 0.8B is small; Gemma 4 is a chat model made to
+answer through letter logprobs. Gemma and other chat models cannot use
+Ollama's decision API (`not a llama.cpp decision model`), hence the gateway.
 
 Any server with `POST /v1/decisions` works: a recent vLLM (native since
 [vllm#60465](https://github.com/vllm-project/vllm/pull/60465)), the
@@ -270,6 +353,30 @@ turns the letters' logprobs into probabilities. It uses only the Python
 standard library and runs from a ConfigMap on the UBI Python image, so it
 needs no image build.
 
+### Decision gateway on your laptop (Ollama)
+
+The `gemma` provider uses `compose.yaml`'s `decision-gateway` service: the
+same `gateway.py`, on port 8000, pointed at the host's Ollama. It forwards the
+model name the app sends (`decision.gemma.model-name`) to Ollama.
+
+```bash
+ollama pull gemma4
+podman compose up -d decision-gateway      # or: docker compose up -d decision-gateway
+```
+
+Stop any `oc port-forward ... 8000:8080` first; both want port 8000. The
+model must return logprobs (Ollama 0.12+ does). The gateway sets
+`BACKEND_EXTRA_BODY={"reasoning_effort":"none"}` so the first token is the
+answer letter, not the start of a thinking trace.
+
+Without containers, run the same script with Python 3:
+
+```bash
+BACKEND_URL=http://localhost:11434/v1 STRUCTURED_OUTPUTS=none \
+BACKEND_EXTRA_BODY='{"reasoning_effort":"none"}' PORT=8000 \
+python3 deploy/openshift/decision-gateway/gateway.py
+```
+
 ## Running on OpenShift
 
 `deploy/openshift/` contains kustomize bases and two overlays. All
@@ -278,7 +385,7 @@ configuration is in the manifests, so `oc apply -k` and Argo CD
 
 | Overlay | Decision model | Needs |
 |---------|----------------|-------|
-| `sandbox` | gateway → shared **Qwen3 8B** (`sandbox-shared-models`) | Red Hat Developer Sandbox, no GPU |
+| `sandbox` | gateway → shared **Qwen3 8B** (`sandbox-shared-models`) | Red Hat Developer Sandbox with the shared models, no GPU |
 | `gpu` | **DiffusionGemma 26B-A4B** on vLLM (OpenShift AI, KServe) | one GPU with >= 40 GB |
 
 Both overlays also deploy the app. A `BuildConfig` builds
@@ -298,11 +405,17 @@ deploy\scripts\deploy.cmd sandbox [-Namespace <ns>] [-LocalSource]  # Windows (w
 - `--delete` / `-Delete` removes everything the overlay created.
 - `gpu` instead of `sandbox` deploys DiffusionGemma as well.
 
+Not every sandbox cluster serves the shared models. If `/ai/decision` returns
+`backend unreachable: ... Name or service not known`, the gateway cannot find
+the model: check `oc get inferenceservice -n sandbox-shared-models`. When that
+list is empty, run the decision model locally with
+[`decision.provider=gemma` or `kev`](#choosing-the-decision-model) instead.
+
 To run the app locally against the sandbox gateway:
 
 ```bash
 oc port-forward svc/decision-gateway 8000:8080   # keeps the default DECISION_BASE_URL
-./gradlew quarkusDev
+DECISION_PROVIDER=openai DECISION_MODEL=qwen3-8b ./gradlew quarkusDev
 ```
 
 The chat patterns (`/ai/plain`, ...) in the deployed app use the provider
@@ -359,7 +472,7 @@ out of the menu, the stock tools, and the cellar files.
 2. In another terminal, from this directory:
 
    ```bash
-   # Docker: compodockerse up -d
+   # Docker: docker compose up -d
    podman compose up -d # Podman
    ```
 
@@ -413,7 +526,7 @@ curl -s localhost:8080/v1/chat/completions \
 ## Notes & troubleshooting
 
 - **Versions**: built against Quarkus 3.40.1, quarkus-langchain4j 1.15.0.CR1
-  and LangChain4j 1.22.0 (see `gradle.properties`, `build.gradle` and
+  and LangChain4j 1.23.0 (see `gradle.properties`, `build.gradle` and
   [Versions](#versions-why-the-build-is-ahead-of-the-platform)). If a newer platform renames a config key, the extension
   docs are authoritative: <https://docs.quarkiverse.io/quarkus-langchain4j/dev/>.
   This project was generated as sample code and has not been compiled in your

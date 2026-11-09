@@ -31,6 +31,57 @@ npx --version
 > JSON as an object. If you prefer real curl, call `curl.exe` (included with
 > Windows 10 and later).
 
+## Fully local demo (Ollama, Open WebUI, no API key)
+
+Gemma 4 on Ollama for the four chat patterns, Gemma 4 or kev on Ollama for
+the decision endpoint, Open WebUI as the chat window. Needs Ollama for
+Windows, Podman Desktop or Docker Desktop, and Node.js (for `mcp`).
+
+1. Pull the models (once):
+
+   ```powershell
+   ollama pull gemma4:12b
+   ollama pull gemma4
+   ollama pull kev:0.8b-q8_0
+   ```
+
+   `gemma4:12b` is the chat model; `gemma4` and `kev:0.8b-q8_0` are the two
+   decision models.
+
+2. In `src\main\resources\application.properties`, set:
+
+   ```properties
+   quarkus.profile=ollama
+   decision.provider=gemma
+   ```
+
+   Use `decision.provider=kev` for kev.
+
+3. Start Open WebUI and the local decision gateway (Gemma needs it, kev not).
+   Stop any `oc port-forward` on port 8000 first:
+
+   ```powershell
+   podman compose up -d
+   ```
+
+   With Docker Desktop: `docker compose up -d`.
+
+4. Start the app in its own window and leave it open:
+
+   ```powershell
+   .\gradlew.bat quarkusDev
+   ```
+
+5. Chat: open <http://localhost:3000> and pick `plain`, `rag`, `agent` or `mcp`.
+   Decision (not in Open WebUI), from a second window:
+
+   ```powershell
+   Invoke-RestMethod -Method Post -Uri http://localhost:8080/ai/decision -ContentType 'text/plain' -Body 'Something milky but not too sweet, I have a long meeting ahead' | ConvertTo-Json -Depth 5
+   ```
+
+   The `model` field shows which decision model answered. Change
+   `decision.provider` and save to switch; dev mode reloads on the next request.
+
 ## Choose a provider
 
 Open `src\main\resources\application.properties` and change one line:
@@ -53,6 +104,10 @@ account (open a new window afterwards):
 ```powershell
 [Environment]::SetEnvironmentVariable('OPENAI_API_KEY', 'sk-...', 'User')
 ```
+
+The key is only for the four chat patterns. The decision endpoint
+(`/ai/decision`) with `decision.provider=gemma` or `kev` runs on the local
+Ollama and needs no key.
 
 ### Ollama (local, no key)
 
@@ -138,22 +193,50 @@ stock and refuses or substitutes, and `/ai/mcp` reads
 
 ## Decision endpoint
 
-Needs a server with `POST /v1/decisions` on `http://localhost:8000/v1`; see
-[Decision endpoint](README.md#decision-endpoint-decision-models). For the
-Developer Sandbox gateway, keep this running in its own window:
+`decision.provider` in `application.properties` picks the decision model; see
+[Choosing the decision model](README.md#choosing-the-decision-model). The
+default is `gemma`: Gemma 4 on Ollama for Windows, through the local decision
+gateway on port 8000. Start it before Quarkus:
+
+```powershell
+ollama pull gemma4
+podman compose up -d decision-gateway
+```
+
+With Docker Desktop: `docker compose up -d decision-gateway`.
+
+Or use kev, which Ollama answers itself (no gateway):
+
+```powershell
+ollama pull kev:0.8b-q8_0
+$env:DECISION_PROVIDER = 'kev'
+.\gradlew.bat quarkusDev
+```
+
+Or the Developer Sandbox gateway (stop the local gateway first, both use port 8000):
 
 ```powershell
 oc port-forward svc/decision-gateway 8000:8080
 ```
+
+and in the Quarkus window:
+
+```powershell
+$env:DECISION_PROVIDER = 'openai'
+$env:DECISION_MODEL = 'qwen3-8b'
+.\gradlew.bat quarkusDev
+```
+
+If the sandbox gateway answers `backend unreachable: ... Name or service not
+known`, this sandbox cluster does not serve the shared models
+(`oc get inferenceservice -n sandbox-shared-models` is empty): use `gemma` or
+`kev`.
 
 Then:
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://localhost:8080/ai/decision -ContentType 'text/plain' -Body 'Something milky but not too sweet, I have a long meeting ahead' | ConvertTo-Json -Depth 5
 ```
-
-To use another decision server, set `DECISION_BASE_URL`, `DECISION_MODEL`
-and `DECISION_API_KEY` with `$env:` before starting Quarkus.
 
 ## Chat UI (Open WebUI)
 

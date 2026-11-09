@@ -3,6 +3,7 @@ package be.maartenvandeperre.aidemo;
 import dev.langchain4j.model.decision.DecisionModel;
 import dev.langchain4j.model.decision.request.ChoiceQuestion;
 import dev.langchain4j.model.decision.request.DecisionRequest;
+import dev.langchain4j.model.decision.request.FieldsInput;
 import dev.langchain4j.model.decision.response.ChoiceAnswer;
 import dev.langchain4j.model.decision.response.DecisionResponse;
 import dev.langchain4j.service.decision.DecisionServices;
@@ -55,7 +56,7 @@ class CoffeeDecisionServiceTest {
         service.chooseCoffee("Something milky");
 
         // Method parameters are sent as named input fields.
-        assertEquals(Map.of("customerText", "Something milky"), model.lastRequest.input());
+        assertEquals(FieldsInput.from(Map.of("customerText", "Something milky")), model.lastRequest.input());
         ChoiceQuestion question = (ChoiceQuestion) model.lastRequest.questions().values().iterator().next();
         assertEquals(CoffeeType.values().length, question.options().size());
         assertTrue(question.options().values().stream().anyMatch(d -> d != null && d.contains("velvety milk")),

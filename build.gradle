@@ -40,7 +40,9 @@ dependencies {
     // --- Decision models -----------------------------------------------------
     // DecisionModel API + declarative DecisionServices (@Decide). The OpenAI
     // implementation (langchain4j-open-ai, pulled in by the openai extension)
-    // speaks the OpenAI Decisions API (POST /v1/decisions).
+    // speaks the OpenAI Decisions API (POST /v1/decisions); the Ollama one
+    // (langchain4j-ollama 1.23.0+, pulled in by the ollama extension) speaks
+    // Ollama's decision API (POST /v1/systemone) for models such as kev.
     implementation 'dev.langchain4j:langchain4j'
     // HTTP client for the decision model (see DefaultClientOpenAiDecisionModel)
     implementation 'dev.langchain4j:langchain4j-http-client-jdk'

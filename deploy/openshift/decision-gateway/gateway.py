@@ -15,14 +15,20 @@ model writes. Question types: choice, predicate (yes/no) and score.
 
 Standard library only. Configuration (environment):
   BACKEND_URL          OpenAI-compatible base URL of the vLLM server (.../v1)
-  BACKEND_MODEL        model name on that server
+  BACKEND_MODEL        model name on that server; empty: use the request's
+                       "model" (local Ollama: the app picks the model)
   BACKEND_TOKEN_FILE   bearer token file, re-read per call (default: the pod's
                        service account token, when present)
   BACKEND_API_KEY      static bearer token, used when no token file exists
   BACKEND_CA_FILE      CA bundle for https backends (default: OpenShift service CA)
   BACKEND_TIMEOUT      seconds per backend call (default 60)
   STRUCTURED_OUTPUTS   structured_outputs (vLLM >= 0.10.2), guided_choice
-                       (older vLLM) or none
+                       (older vLLM) or none (Ollama, OpenAI)
+  BACKEND_EXTRA_BODY   JSON merged into every chat request; turns thinking
+                       off so the first token is the answer letter. Default
+                       {"chat_template_kwargs": {"enable_thinking": false}}
+                       (vLLM). Ollama: {"reasoning_effort": "none"}.
+                       OpenAI (gpt-4.1-mini, gpt-4o-mini): {}
   MAX_OPTIONS          options per question; vLLM returns at most 20 top
                        logprobs by default (default 20)
   PORT                 listen port (default 8080)
@@ -46,6 +52,8 @@ API_KEY = os.environ.get("BACKEND_API_KEY", "")
 CA_FILE = os.environ.get("BACKEND_CA_FILE", SA_DIR + "/service-ca.crt")
 TIMEOUT = float(os.environ.get("BACKEND_TIMEOUT", "60"))
 STRUCTURED_OUTPUTS = os.environ.get("STRUCTURED_OUTPUTS", "structured_outputs")
+EXTRA_BODY = json.loads(os.environ.get(
+    "BACKEND_EXTRA_BODY", '{"chat_template_kwargs": {"enable_thinking": false}}') or "{}")
 MAX_OPTIONS = min(int(os.environ.get("MAX_OPTIONS", "20")), 26)
 PORT = int(os.environ.get("PORT", "8080"))
 
@@ -111,7 +119,7 @@ def input_text(value):
     return str(value)
 
 
-def ask(text, instructions, options):
+def ask(model, text, instructions, options):
     """Return (probabilities per option index, prompt tokens) for one question."""
     if not 2 <= len(options) <= MAX_OPTIONS:
         raise ApiError(400, "questions need between 2 and %d options, got %d" % (MAX_OPTIONS, len(options)))
@@ -129,14 +137,14 @@ def ask(text, instructions, options):
         "Question: %s\n\nOptions:\n%s" % (instructions, menu)
     )
     body = {
-        "model": BACKEND_MODEL,
+        "model": model,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": text}],
         "max_tokens": 1,
         "temperature": 0,
         "logprobs": True,
         "top_logprobs": len(letters),
-        "chat_template_kwargs": {"enable_thinking": False},
     }
+    body.update(EXTRA_BODY)
     if STRUCTURED_OUTPUTS == "structured_outputs":
         body["structured_outputs"] = {"choice": letters}
     elif STRUCTURED_OUTPUTS == "guided_choice":
@@ -166,7 +174,7 @@ def option_line(value, description):
     return "%s: %s" % (name, description) if description else name
 
 
-def answer(text, question):
+def answer(model, text, question):
     kind = question.get("type")
     name = question.get("name")
     instructions = question.get("instructions") or ""
@@ -175,7 +183,7 @@ def answer(text, question):
         values = [c.get("value") for c in choices]
         if len(set(map(str, values))) != len(values):
             raise ApiError(400, "question '%s' has duplicate choice values" % name)
-        probs, tokens = ask(text, instructions,
+        probs, tokens = ask(model, text, instructions,
                             [option_line(c.get("value"), c.get("description")) for c in choices])
         best = max(range(len(probs)), key=probs.__getitem__)
         return {
@@ -185,11 +193,11 @@ def answer(text, question):
             "probabilities": [{"value": v, "probability": p} for v, p in zip(values, probs)],
         }, tokens
     if kind == "predicate":
-        probs, tokens = ask(text, instructions, ["yes", "no"])
+        probs, tokens = ask(model, text, instructions, ["yes", "no"])
         return {"type": "predicate", "name": name, "probability": probs[0]}, tokens
     if kind == "score":
         levels = question.get("levels") or []
-        probs, tokens = ask(text, instructions,
+        probs, tokens = ask(model, text, instructions,
                             [option_line(l.get("label"), l.get("description")) for l in levels])
         return {
             "type": "score",
@@ -208,14 +216,17 @@ def decide(request):
     text = input_text(request.get("input"))
     if not text.strip():
         raise ApiError(400, "'input' must not be empty")
+    model = BACKEND_MODEL or request.get("model") or ""
+    if not model:
+        raise ApiError(400, "no model: set BACKEND_MODEL or send 'model'")
     answers, prompt_tokens = [], 0
     for question in questions:
-        result, tokens = answer(text, question)
+        result, tokens = answer(model, text, question)
         answers.append(result)
         prompt_tokens += tokens
     return {
         "object": "decision",
-        "model": request.get("model") or BACKEND_MODEL,
+        "model": request.get("model") or model,
         "answers": answers,
         "usage": {
             "input_tokens": prompt_tokens,
@@ -241,7 +252,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path in ("/healthz", "/health"):
-            self.send_json(200, {"status": "UP", "backend": BACKEND_URL, "model": BACKEND_MODEL})
+            self.send_json(200, {"status": "UP", "backend": BACKEND_URL, "model": BACKEND_MODEL or "(from request)"})
         elif self.path == "/v1/models":
             try:
                 self.send_json(200, backend("GET", "/models"))
@@ -271,5 +282,5 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("decision gateway on :%d -> %s (model %s)" % (PORT, BACKEND_URL, BACKEND_MODEL), flush=True)
+    print("decision gateway on :%d -> %s (model %s)" % (PORT, BACKEND_URL, BACKEND_MODEL or "from request"), flush=True)
     ThreadingHTTPServer(("", PORT), Handler).serve_forever()
