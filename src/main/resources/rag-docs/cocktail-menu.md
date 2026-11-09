@@ -12,7 +12,7 @@
 - Price: EUR 13.00
 - Note: a bright yellow tropical cocktail, garnished with rosemary.
 
-### Maarten's Martini
+### Lutske's Martini
 - Type: Signature Espresso Martini variation
 - Ingredients: gin, espresso, coffee liqueur, raspberry, lime
 - Price: EUR 12.00
